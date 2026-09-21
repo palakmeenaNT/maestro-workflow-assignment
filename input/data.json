@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "Alice",
+    "department": "Engineering",
+    "score": 85
+  },
+  {
+    "id": 2,
+    "name": "Bob",
+    "department": "Engineering",
+    "score": 72
+  },
+  {
+    "id": 3,
+    "name": "Charlie",
+    "department": "Marketing",
+    "score": 91
+  },
+  {
+    "id": 4,
+    "name": "Diana",
+    "department": "Engineering",
+    "score": 64
+  },
+  {
+    "id": 5,
+    "name": "Eva",
+    "department": "Marketing",
+    "score": 88
+  }
+]
