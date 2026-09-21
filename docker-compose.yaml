@@ -1,0 +1,121 @@
+
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: maestro-postgres
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+
+  airflow-webserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: maestro-airflow-webserver
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./plugins:/opt/airflow/plugins
+      - ./input:/opt/airflow/input
+      - ./notebooks:/opt/airflow/notebooks
+      - ./output:/opt/airflow/output
+
+    ports:
+      - "8082:8080"
+
+    command: webserver
+
+    restart: unless-stopped
+
+
+  airflow-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: maestro-airflow-scheduler
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY}
+
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./plugins:/opt/airflow/plugins
+      - ./input:/opt/airflow/input
+      - ./notebooks:/opt/airflow/notebooks
+      - ./output:/opt/airflow/output
+
+    command: scheduler
+
+    restart: unless-stopped
+
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+
+    container_name: maestro-api
+
+    depends_on:
+      - airflow-webserver
+
+    environment:
+      GENERATED_DAGS_DIR: /app/dags/generated
+      TEMPLATES_DIR: /app/dags/templates
+      AIRFLOW_URL: ${AIRFLOW_URL}
+      AIRFLOW_USERNAME: ${AIRFLOW_USERNAME}
+      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD}
+      OUTPUT_FILE: /app/output/result.json
+
+    volumes:
+      - ./dags:/app/dags
+      - ./input:/app/input
+      - ./output:/app/output
+
+    ports:
+      - "8000:8000"
+
+    restart: unless-stopped
+
+
+volumes:
+  postgres_data:
