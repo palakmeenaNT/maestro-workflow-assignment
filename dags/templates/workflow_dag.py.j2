@@ -1,0 +1,44 @@
+from datetime import datetime
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.providers.smtp.operators.smtp import EmailOperator
+from airflow.providers.standard.sensors.filesystem import FileSensor
+
+{% for task in workflow.tasks if task.operator == "python" %}
+{{ task.function.source }}
+
+{% endfor %}
+with DAG(
+    dag_id="{{ workflow.dag_id }}",
+    start_date=datetime(2026, 1, 1),
+    schedule=None,
+    catchup=False,
+    tags=["mini-maestro", "generated"],
+) as dag:
+{% for task in workflow.tasks %}
+{% if task.operator == "python" %}
+    {{ task.task_id }} = PythonOperator(
+        task_id="{{ task.task_id }}",
+        python_callable={{ task.function.name }},
+    )
+{% elif task.operator == "file_sensor" %}
+    {{ task.task_id }} = FileSensor(
+        task_id="{{ task.task_id }}",
+        filepath={{ task.config.filepath | tojson }},
+        poke_interval=5,
+        timeout=60,
+        mode="reschedule",
+    )
+{% elif task.operator == "email" %}
+    {{ task.task_id }} = EmailOperator(
+        task_id="{{ task.task_id }}",
+        to={{ task.config.to | tojson }},
+        subject={{ task.config.get("subject", "Mini-Maestro Notification") | tojson }},
+        html_content={{ task.config.get("message", "") | tojson }},
+    )
+{% endif %}
+{% endfor %}
+{% for dependency in workflow.dependencies %}
+    {{ dependency[0] }} >> {{ dependency[1] }}
+{% endfor %}
